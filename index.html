@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CSV File Upload with Google Maps</title>
+    <!-- use version 0.20.0 -->
+    <script lang="javascript" src="https://cdn.sheetjs.com/xlsx-0.20.0/package/dist/xlsx.full.min.js"></script>
+    <!-- Include the Google Maps API with your API key -->
+    <script async defer
+        src="https://maps.googleapis.com/maps/api/js?key=AIzaSyDi3kInvWusUg4z6_sdFCa5PQBKL7QMEu4&callback=initMap">
+        </script>
+    <style>
+        /* Style the file input and button for better appearance */
+        #fileInput {
+            display: none;
+        }
+
+        #uploadButton {
+            padding: 10px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-bottom: 100px;
+
+        }
+
+        /* Set the map container to fill the entire page */
+        #map {
+            /* height: vh; Adjust height as needed */
+            width: 90%;
+            height: 80vh;
+            padding: 10px;
+            /* border: 2px solid black; */
+            margin-top: 10px;
+        }
+    </style>
+    <link rel="stylesheet" crossorigin href="/assets/index-f0mNRiTD.css">
+</head>
+
+<body>
+    <h2>Location Mapper | Google Maps</h2>
+
+    <!-- Create a button to trigger file input -->
+    <label for="fileInput" id="uploadButton">Upload Excel File</label>
+    <!-- <input class="input_cont" type="file" id="fileInput" accept=".csv" onchange="handleFileUpload()"> -->
+    <input class="input_cont" type="file" id="fileInput" accept=".csv, .xlsx, .xls" onchange="handleFileUpload()">
+
+    <!-- Create a div to hold the map -->
+    <div id="map"></div>
+
+    <script>
+        let map; // Declare the map variable globally
+
+        /*const handleFileUpload = () => {
+            const fileInput = document.getElementById('fileInput');
+            const file = fileInput.files[0];
+
+            if (file) {
+                readCSV(file);
+            } else {
+                console.error('No file selected.');
+            }
+        };
+
+        const readCSV = (file) => {
+            const reader = new FileReader();
+
+            reader.onload = (event) => {
+                const csvData = event.target.result;
+                //console.log(csvData);
+                const data = displayCSVInConsole(csvData);
+                console.log(data);
+                addMarkers(data);
+            };
+
+            reader.readAsText(file);
+        };
+
+        /*const displayCSVInConsole = (csvData) => {
+            const rows = csvData.split('\n');
+            const header = rows[0].split(',');
+
+            const result = rows.slice(1).map(row => {
+                const values = row.split(',');
+                return header.reduce((obj, key, index) => {
+                    obj[key] = values[index];
+                    return obj;
+                }, {});
+            });
+
+            return result;
+        };*/
+
+        /*const displayCSVInConsole = (csvData) => {
+            const rows = csvData.split('\n');
+        
+            const result = rows.map(row => {
+                const values = row.split(',');
+                return values.reduce((obj, value, index) => {
+                    obj[`Column${index + 1}`] = value;  // You can customize the column names if needed.
+                    return obj;
+                }, {});
+            });
+        
+            return result;
+        };*/
+
+        const handleFileUpload = () => {
+            const fileInput = document.getElementById('fileInput');
+            const file = fileInput.files[0];
+
+            if (file) {
+                readExcel(file);
+            } else {
+                console.error('No file selected.');
+            }
+        };
+
+        const readExcel = (file) => {
+            const reader = new FileReader();
+
+            reader.onload = (event) => {
+                const data = event.target.result;
+                const workbook = XLSX.read(data, { type: 'binary' });
+                const sheetName = workbook.SheetNames[0]; // Assuming the data is in the first sheet
+                const sheet = workbook.Sheets[sheetName];
+                const csvData = XLSX.utils.sheet_to_csv(sheet);
+
+                const parsedData = displayCSVInConsole(csvData);
+                console.log(parsedData);
+                addMarkers(parsedData);
+            };
+
+            reader.readAsBinaryString(file);
+        };
+
+        const displayCSVInConsole = (csvData) => {
+            const rows = csvData.split('\n');
+
+            const result = rows.map(row => {
+                const values = row.split(',');
+                return values.reduce((obj, value, index) => {
+                    obj[`Column${index + 1}`] = value.trim(); // Trim to remove any leading/trailing whitespaces
+                    return obj;
+                }, {});
+            });
+
+            return result;
+        };
+
+
+        function parseDMS(dmsString) {
+            // Split the input string into parts
+            const parts = dmsString.split(/[^\d\w.]+/);
+
+            // Extract values from parts
+            const degrees = parseFloat(parts[0]);
+            const minutes = parseFloat(parts[1]);
+            const seconds = parseFloat(parts[2]);
+            const direction = parts[3];
+
+            // Calculate decimal degrees
+            let decimalDegrees = degrees + (minutes / 60) + (seconds / 3600);
+
+            // Adjust for southern or western hemisphere
+            if (direction === 'S' || direction === 'W') {
+                decimalDegrees = -decimalDegrees;
+            }
+
+            return decimalDegrees;
+        }
+        function parseDMSLongitude(dmsString) {
+            // Split the input string into parts
+            const parts = dmsString.split(/[^\d\w.]+/);
+
+            // Extract values from parts
+            const degrees = parseFloat(parts[0]);
+            const minutes = parseFloat(parts[1]);
+            const seconds = parseFloat(parts[2]);
+            const direction = parts[3];
+
+            // Calculate decimal degrees
+            let decimalDegrees = degrees + (minutes / 60) + (seconds / 3600);
+
+            // Adjust for western hemisphere
+            if (direction === 'W') {
+                decimalDegrees = -decimalDegrees;
+            }
+
+            return decimalDegrees;
+        }
+
+        const addMarkers = (data) => {
+            //console.log("data",data);
+            // Clear existing markers
+            markers.forEach(marker => marker.setMap(null));
+
+            // create centering point
+
+
+            // Create a new map centered at the first point in the CSV file
+            const centerLatLng = {
+                lat: 23.0225,
+                lng: 72.5714
+            };
+
+            map = new google.maps.Map(document.getElementById('map'), {
+                center: centerLatLng,
+                zoom: 12 // Adjust the zoom level as needed
+            });
+
+
+
+            // Add new markers for each point in the CSV file
+            data.forEach((point) => {
+
+                try {
+                    //console.log("Point ",point.Column1);
+
+                    const lat = parseDMS(point.Column1);
+                    const lon = parseDMSLongitude(point.Column2);
+
+                    //console.log(lat, lon);
+
+                    const marker = new google.maps.Marker({
+                        //position: { lat: parseFloat(point.lat), lng: parseFloat(point.lon) },
+                        position: { lat: parseFloat(lat), lng: parseFloat(lon) },
+
+                        map: map,
+                        title: point.title || 'Marker' // Use a default title if not specified
+                    });
+                    markers.push(marker);
+                }
+                catch (err) {
+                    console.log("Invalid Lat/Lon");
+                }
+
+            });
+        };
+
+        // Initialize the map
+        function initMap() {
+            // This function will be called by the Google Maps API script
+        }
+
+        // Array to store markers
+        const markers = [];
+    </script>
+</body>
+
+</html>
